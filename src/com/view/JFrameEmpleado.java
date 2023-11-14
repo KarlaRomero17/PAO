@@ -4,18 +4,187 @@
  */
 package com.view;
 
+import com.controller.*;
+import com.controller.exceptions.NonexistentEntityException;
+import com.entities.*;
+import java.util.logging.Logger;
+import java.util.logging.Level;
+import java.util.List;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
+
 /**
  *
  * @author Lissette
  */
 public class JFrameEmpleado extends javax.swing.JFrame {
 
+    Empleado empleado = new Empleado();
+    EmpleadoJpaController ejc = new EmpleadoJpaController();
+    private javax.swing.ButtonGroup buttonGroup1;
     /**
      * Creates new form JFrameEmpleado
      */
     public JFrameEmpleado() {
         initComponents();
+        this.setLocationRelativeTo(this);
+        tablaEmpleado();
+        //tfCodigo.setEnabled(false);
+        // Inicializar el ButtonGroup
+        buttonGroup1 = new javax.swing.ButtonGroup();
+        // Radio botones en el mismo ButtonGroup
+        buttonGroup1.add(rbFemenino);
+        buttonGroup1.add(rbMasculino);
     }
+    
+    //Método para agregar registros
+    public void agregar() throws Exception {
+        String codigoText = this.tfCodigo.getText();
+        if (codigoText.isEmpty() || !codigoText.matches("\\d+")) {
+        JOptionPane.showMessageDialog(null, "El código de empleado no es un número válido", "Error", JOptionPane.ERROR_MESSAGE);
+            return; // Salir del método si el código no es válido
+        }
+        try {
+            //empleado.setCodigoEmpleado(Integer.parseInt(codigoText));
+            empleado.setNombre(this.tfNombre.getText());
+            if (this.rbFemenino.isSelected()) {
+                empleado.setSexo("Femenino");
+            } else {
+                empleado.setSexo("Masculino");
+            }
+            empleado.setEdad(Integer.parseInt(this.spnEdad.getValue().toString()));
+            empleado.setCargo(this.cbbCargo.getSelectedItem().toString());
+            ejc.create(empleado);
+            JOptionPane.showMessageDialog(null, "Datos insertados correctamente");
+            limpiar();
+            tablaEmpleado();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null, "Error al convertir el código de empleado a un número", "Error", JOptionPane.ERROR_MESSAGE);
+            } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al agregar empleado", "Error",
+            JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    public void tablaEmpleado() {
+        String[] columnas = {"Código empleado", "Nombre", "Sexo", "Edad", "Cargo"};
+        Object[] obj = new Object[5];
+        DefaultTableModel tabla = new DefaultTableModel(null, columnas);
+        List ls;
+        try {
+            ls = ejc.findEmpleadoEntities();
+            for (int i = 0; i < ls.size(); i++) {
+                empleado = (Empleado) ls.get(i);
+                obj[0] = empleado.getCodigoEmpleado();
+                obj[1] = empleado.getNombre();
+                obj[2] = empleado.getSexo();
+                obj[3] = empleado.getEdad();
+                obj[4] = empleado.getCargo();
+                tabla.addRow(obj);
+            }
+            ls = ejc.findEmpleadoEntities();
+            this.tblEmpleado.setModel(tabla);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al mostrar datos");
+        }
+    }
+    
+    public void llenarTabla() {
+        int fila = this.tblEmpleado.getSelectedRow();
+        llenarCampos(fila);
+    }
+    
+    // Nuevo método para llenar los campos con la información del registro seleccionado
+    private void llenarCampos(int filaSeleccionada) {
+        if (filaSeleccionada != -1) { // Seleccionó alguna fila
+            tfCodigo.setText(String.valueOf(this.tblEmpleado.getValueAt(filaSeleccionada,0)));
+            tfNombre.setText(String.valueOf(this.tblEmpleado.getValueAt(filaSeleccionada,1)));
+            String sexo = String.valueOf(this.tblEmpleado.getValueAt(filaSeleccionada, 2));
+            if (sexo.toLowerCase().equals("femenino")) {
+                this.rbFemenino.setSelected(true);
+            } else {
+                this.rbMasculino.setSelected(true);
+            }
+            int cantidad = Integer.parseInt(String.valueOf(this.tblEmpleado.getValueAt(filaSeleccionada, 3)));
+            spnEdad.setValue(cantidad);
+            String cargo = String.valueOf(this.tblEmpleado.getValueAt(filaSeleccionada,4));
+            this.cbbCargo.getModel().setSelectedItem(cargo);
+        }
+    }
+    
+    public void limpiar() {
+        this.tfCodigo.setText("");
+        this.tfNombre.setText("");
+        this.cbbCargo.setSelectedIndex(0);
+        this.spnEdad.setValue(18);
+    }
+    
+    //Método de editar o modificar
+    public void editar() throws Exception {
+        String codigoText = this.tfCodigo.getText();
+        if (codigoText.isEmpty() || !codigoText.matches("\\d+")) {
+            JOptionPane.showMessageDialog(null, "El código de empleado no es un número válido", "Error", JOptionPane.ERROR_MESSAGE);
+            return; // Salir del método si el código no es válido
+        }
+        try {
+            int codigoEmpleado = Integer.parseInt(codigoText);
+            empleado = ejc.findEmpleado(codigoEmpleado);
+            if (empleado == null) {
+                JOptionPane.showMessageDialog(null, "No se encontró un empleado con el código especificado", "Error", JOptionPane.ERROR_MESSAGE);
+                return; // Salir del método si no se encuentra el empleado
+            }
+            empleado.setNombre(this.tfNombre.getText());
+            if (this.rbFemenino.isSelected()) {
+                empleado.setSexo("Femenino");
+            } else {
+                empleado.setSexo("Masculino");
+            }
+            empleado.setEdad(Integer.parseInt(this.spnEdad.getValue().toString()));
+            empleado.setCargo(this.cbbCargo.getSelectedItem().toString());
+            int decision = JOptionPane.showConfirmDialog(this, "Desea modificar el empleado", "Modificar empleado", JOptionPane.YES_NO_OPTION);
+            if (decision == 0) {
+                ejc.edit(empleado); // Guardar los cambios en la base de datos
+                JOptionPane.showMessageDialog(rootPane, "Modificado con éxito","Confirmación", JOptionPane.INFORMATION_MESSAGE);
+                limpiar();
+                tablaEmpleado();
+            } else {
+                limpiar();
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null, "Error al convertir el código de empleado a un número", "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (NonexistentEntityException e) {
+            JOptionPane.showMessageDialog(null, "Error al editar empleado: el empleado no existe", "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al editar empleado", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    public void eliminar() throws NonexistentEntityException {
+        String codigoText = this.tfCodigo.getText().trim(); // Trimming para eliminar espacios en blanco
+        if (codigoText.isEmpty()) {
+            JOptionPane.showMessageDialog(null, "El campo de código está vacío", "Error", JOptionPane.ERROR_MESSAGE);
+            return; // Salir del método si el campo de código está vacío
+        }
+        try {
+            int codigoEmpleado = Integer.parseInt(codigoText);
+            empleado.setCodigoEmpleado(codigoEmpleado);
+            int decision = JOptionPane.showConfirmDialog(this, "Desea eliminar el empleado", "Eliminar empleado", JOptionPane.YES_NO_OPTION);
+            if (decision == 0) {
+                ejc.destroy(empleado.getCodigoEmpleado());
+                JOptionPane.showMessageDialog(rootPane, "Eliminado con éxito", "Confirmación", JOptionPane.INFORMATION_MESSAGE);
+                limpiar();
+                tablaEmpleado();
+            } else {
+                limpiar();
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null, "El código de empleado no es un número válido", "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (NonexistentEntityException e) {
+            JOptionPane.showMessageDialog(null, "No se encontró un empleado con el código especificado", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -46,7 +215,7 @@ public class JFrameEmpleado extends javax.swing.JFrame {
         btnLimpiar = new javax.swing.JButton();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane1 = new javax.swing.JScrollPane();
-        jTableEmpleado = new javax.swing.JTable();
+        tblEmpleado = new javax.swing.JTable();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -141,10 +310,25 @@ public class JFrameEmpleado extends javax.swing.JFrame {
         );
 
         btnAgregar.setText("Agregar");
+        btnAgregar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnAgregarActionPerformed(evt);
+            }
+        });
 
         btnEditar.setText("Editar");
+        btnEditar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEditarActionPerformed(evt);
+            }
+        });
 
         btnEliminar.setText("Eliminar");
+        btnEliminar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarActionPerformed(evt);
+            }
+        });
 
         btnLimpiar.setText("Limpiar");
         btnLimpiar.addActionListener(new java.awt.event.ActionListener() {
@@ -183,7 +367,7 @@ public class JFrameEmpleado extends javax.swing.JFrame {
                 .addContainerGap(23, Short.MAX_VALUE))
         );
 
-        jTableEmpleado.setModel(new javax.swing.table.DefaultTableModel(
+        tblEmpleado.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
                 {},
                 {},
@@ -194,7 +378,12 @@ public class JFrameEmpleado extends javax.swing.JFrame {
 
             }
         ));
-        jScrollPane1.setViewportView(jTableEmpleado);
+        tblEmpleado.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblEmpleadoMouseClicked(evt);
+            }
+        });
+        jScrollPane1.setViewportView(tblEmpleado);
 
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
@@ -249,8 +438,50 @@ public class JFrameEmpleado extends javax.swing.JFrame {
 
     private void btnLimpiarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnLimpiarActionPerformed
         // TODO add your handling code here:
+        limpiar();
     }//GEN-LAST:event_btnLimpiarActionPerformed
 
+    private void btnAgregarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnAgregarActionPerformed
+        // TODO add your handling code here:
+        try {
+            agregar();
+            limpiar();
+            tablaEmpleado();
+        } catch (Exception e) {
+            Logger.getLogger(JFrameEmpleado.class.getName()).log(Level.SEVERE, null, e);
+        }
+    }//GEN-LAST:event_btnAgregarActionPerformed
+
+    private void btnEditarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEditarActionPerformed
+        // TODO add your handling code here:
+        try {
+            editar();
+            tablaEmpleado();
+        } catch (Exception e) {
+            Logger.getLogger(JFrameEmpleado.class.getName()).log(Level.SEVERE, null, e);
+        }
+
+    }//GEN-LAST:event_btnEditarActionPerformed
+
+    private void btnEliminarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarActionPerformed
+        // TODO add your handling code here:
+        try {
+            eliminar();
+            tablaEmpleado();
+        } catch (NonexistentEntityException e) {
+            Logger.getLogger(JFrameEmpleado.class.getName()).log(Level.SEVERE, null, e);
+        }
+
+    }//GEN-LAST:event_btnEliminarActionPerformed
+
+    private void tblEmpleadoMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblEmpleadoMouseClicked
+        // TODO add your handling code here:
+        int filaSeleccionada = tblEmpleado.getSelectedRow();
+        llenarCampos(filaSeleccionada); // Llena los campos al hacer clic en una fila
+
+    }//GEN-LAST:event_tblEmpleadoMouseClicked
+    
+    
     /**
      * @param args the command line arguments
      */
@@ -302,10 +533,10 @@ public class JFrameEmpleado extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JTable jTableEmpleado;
     private javax.swing.JRadioButton rbFemenino;
     private javax.swing.JRadioButton rbMasculino;
     private javax.swing.JSpinner spnEdad;
+    private javax.swing.JTable tblEmpleado;
     private javax.swing.JTextField tfCodigo;
     private javax.swing.JTextField tfNombre;
     // End of variables declaration//GEN-END:variables
